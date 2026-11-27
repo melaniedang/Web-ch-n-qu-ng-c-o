@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Chặn popup Shopee/TikTok Shop trên web đọc truyện
 // @namespace    chan-popup-shopee-tiktok
-// @version      1.2.0
+// @version      1.3.0
 // @description  Chặn các cú bấm bị cướp sang Shopee, TikTok Shop, Lazada: popup, nút "Close" giả, nút "Chương sau" bị gài link, tab mới tự bật, hình nổi (bóng, vợt...) đè lên truyện.
 // @updateURL    https://raw.githubusercontent.com/melaniedang/Web-ch-n-qu-ng-c-o/claude/block-mobile-ad-popups-yujame/chan-popup.user.js
 // @downloadURL  https://raw.githubusercontent.com/melaniedang/Web-ch-n-qu-ng-c-o/claude/block-mobile-ad-popups-yujame/chan-popup.user.js
@@ -55,7 +55,27 @@
 
 
   // ---- 0. Chặn mạng quảng cáo (Google AdSense/Ad Manager, banner dính đầu/cuối trang...) ----
-  const AD_NET = /(googlesyndication|doubleclick|googleadservices|adtrafficquality|adservice\.google|googletagservices|amazon-adsystem|taboola|outbrain|mgid\.com|adnxs|criteo|popads|propellerads|adsterra|exoclick|onclicka|hilltopads|admicro|adtima|eclick\.vn|ambientplatform|vliplatform|clickadu|monetag|a-ads\.com)/i;
+  const AD_NET = /(googlesyndication|doubleclick|googleadservices|adtrafficquality|adservice\.google|googletagservices|amazon-adsystem|taboola|outbrain|mgid\.com|adnxs|criteo|popads|propellerads|adsterra|exoclick|onclicka|hilltopads|admicro|adtima|eclick\.vn|ambientplatform|vliplatform|clickadu|monetag|a-ads\.com|browpotware|aj1559\.online|highperformanceformat|profitablecpmrate|effectivegatecpm|realizationnewestfangs|pemsrv|tsyndicate|juicyads|trafficjunky|adcash|richads|galaksion|hilltopads|bidgear|vidoomy|zeropark)/i;
+
+  // Nhận diện chung cho mạng quảng cáo "đổi domain liên tục" (popunder, hình nổi...)
+  const SAFE_CDN = /(^|\.)(googletagmanager\.com|google-analytics\.com|gstatic\.com|google\.com|recaptcha\.net|cloudflare\.com|cdnjs\.cloudflare\.com|jsdelivr\.net|unpkg\.com|jquery\.com|bootstrapcdn\.com|fontawesome\.com|facebook\.net|youtube\.com|ytimg\.com|disqus\.com|disquscdn\.com|wp\.com|gravatar\.com|hcaptcha\.com|challenges\.cloudflare\.com)$/i;
+  const JUNK_TLD = /\.(online|xyz|top|site|click|icu|pro|space|fun|store|cfd|sbs|lol|quest|rest|bond|cyou|monster|buzz|live|website|world|today|life|work|link|best|bid|win|loan|racing|cam|surf|autos|boats|homes|motorcycles|beauty|hair|makeup|skin|mom|yachts)$/i;
+  function isAdScript(n) {
+    const src = n.getAttribute('src') || '';
+    if (!src) return false;
+    if (AD_NET.test(src)) return true;
+    let u;
+    try { u = new URL(src, location.href); } catch (e) { return false; }
+    const host = u.hostname;
+    if (!host || host === location.hostname || host.endsWith('.' + location.hostname.replace(/^www\./, ''))) return false;
+    if (SAFE_CDN.test(host)) return false;
+    // Dấu hiệu điển hình của script popunder: tắt Rocket Loader của Cloudflare
+    if (n.getAttribute('data-cfasync') === 'false') return true;
+    // Domain rác: đuôi lạ, hoặc tên kiểu "aj1559", "x7k2.top"
+    if (JUNK_TLD.test(host)) return true;
+    if (/^[a-z]{1,3}\d{3,}\./i.test(host)) return true;
+    return false;
+  }
   const AD_CSS = [
     'ins.adsbygoogle', '.adsbygoogle', '[data-anchor-status]', '[data-ad-slot]', '[data-ad-client]',
     'iframe[id^="aswift_"]', 'iframe[id^="google_ads_iframe"]', '[id^="google_ads_iframe"]',
@@ -76,7 +96,7 @@
   addCSS();
 
   function killScript(n) {
-    if (n && n.tagName === 'SCRIPT' && n.src && AD_NET.test(n.src)) {
+    if (n && n.tagName === 'SCRIPT' && isAdScript(n)) {
       n.type = 'javascript/blocked';
       n.removeAttribute('src');
       return true;
