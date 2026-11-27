@@ -1,8 +1,10 @@
 // ==UserScript==
 // @name         Chặn popup Shopee/TikTok Shop trên web đọc truyện
 // @namespace    chan-popup-shopee-tiktok
-// @version      1.0.0
-// @description  Chặn các cú bấm bị cướp sang Shopee, TikTok Shop, Lazada: popup, nút "Close" giả, nút "Chương sau" bị gài link, tab mới tự bật.
+// @version      1.1.0
+// @description  Chặn các cú bấm bị cướp sang Shopee, TikTok Shop, Lazada: popup, nút "Close" giả, nút "Chương sau" bị gài link, tab mới tự bật, hình nổi (bóng, vợt...) đè lên truyện.
+// @updateURL    https://raw.githubusercontent.com/melaniedang/Web-ch-n-qu-ng-c-o/claude/block-mobile-ad-popups-yujame/chan-popup.user.js
+// @downloadURL  https://raw.githubusercontent.com/melaniedang/Web-ch-n-qu-ng-c-o/claude/block-mobile-ad-popups-yujame/chan-popup.user.js
 // @match        *://*/*
 // @exclude      *://*.shopee.vn/*
 // @exclude      *://shopee.vn/*
@@ -219,6 +221,78 @@
     });
   }
 
+
+  // ---- 6. Ẩn "vật thể nổi" (quả bóng, cây vợt...) đè lên màn hình ----
+  // Quảng cáo kiểu này không có link Shopee trong HTML (link nằm trong JS),
+  // nên nhận diện bằng hình dạng: nổi trên trang + chỉ có hình + không có chữ/link của web.
+  const SAFE_TAGS = /^(HTML|BODY|HEADER|NAV|MAIN|ARTICLE|FOOTER)$/;
+  function sameSite(href) {
+    try { return new URL(href, location.href).hostname === location.hostname; } catch (e) { return false; }
+  }
+  function floatingRoot(el) {
+    // Tìm tổ tiên cao nhất đang "nổi" (fixed/sticky, hoặc absolute có z-index cao)
+    let found = null;
+    for (let n = el; n && n.nodeType === 1 && !SAFE_TAGS.test(n.tagName); n = n.parentElement) {
+      const cs = getComputedStyle(n);
+      const z = parseInt(cs.zIndex, 10) || 0;
+      if (cs.position === 'fixed' || cs.position === 'sticky' || (cs.position === 'absolute' && z >= 50)) found = n;
+    }
+    return found;
+  }
+  function looksLikeAd(el) {
+    if (el.id === '__chanpopup_toast') return false;
+    // Giữ lại thanh menu, nút chuyển chương, ô tìm kiếm... của web
+    if (el.matches('a[href]') && sameSite(el.getAttribute('href'))) return false;
+    if ([...el.querySelectorAll('a[href]')].some((a) => sameSite(a.getAttribute('href') || a.href))) return false;
+    if (el.querySelector('input,select,textarea')) return false;
+    const text = (el.innerText || '').replace(/[\s×✕xX]/g, '');
+    if (text.length > 25) return false;
+    const imgs = el.querySelectorAll('img').length;
+    if (imgs > 3) return false; // khung chứa ảnh truyện
+    const r = el.getBoundingClientRect();
+    if (r.width < 8 || r.height < 8) return false;
+    const vArea = window.innerWidth * window.innerHeight;
+    const hasVisual =
+      imgs > 0 || el.querySelector('svg,canvas,video,iframe,picture') ||
+      /url\(/.test(getComputedStyle(el).backgroundImage) ||
+      [...el.querySelectorAll('*')].some((c) => /url\(/.test(getComputedStyle(c).backgroundImage));
+    // Lớp phủ trong suốt to (bẫy chạm) hoặc hình nổi nhỏ/vừa
+    if (!hasVisual) return r.width * r.height > vArea * 0.5 && text.length === 0;
+    return r.width * r.height < vArea * 0.6;
+  }
+  let hiddenCount = 0;
+  function hideFloaters() {
+    if (!document.body) return;
+    const W = window.innerWidth, H = window.innerHeight;
+    const seen = new Set();
+    const roots = new Set();
+    for (let ix = 0; ix <= 6; ix++) {
+      for (let iy = 0; iy <= 10; iy++) {
+        const x = Math.min(W - 2, Math.max(2, (W * ix) / 6));
+        const y = Math.min(H - 2, Math.max(2, (H * iy) / 10));
+        const top = document.elementFromPoint(x, y);
+        if (!top || seen.has(top)) continue;
+        seen.add(top);
+        const root = floatingRoot(top);
+        if (!root || roots.has(root)) continue;
+        roots.add(root);
+        if (looksLikeAd(root)) {
+          root.style.setProperty('display', 'none', 'important');
+          hiddenCount++;
+          if (hiddenCount <= 3) toast('Đã ẩn quảng cáo nổi');
+        }
+      }
+    }
+  }
+  let floatTimer = null;
+  function scheduleFloaters() {
+    if (floatTimer) return;
+    floatTimer = setTimeout(() => { floatTimer = null; try { hideFloaters(); } catch (e) {} }, 250);
+  }
+  window.addEventListener('scroll', scheduleFloaters, { passive: true });
+  window.addEventListener('resize', scheduleFloaters);
+  setInterval(scheduleFloaters, 1200);
+
   let pending = false;
   const mo = new MutationObserver(() => {
     if (pending) return;
@@ -226,6 +300,7 @@
     requestAnimationFrame(() => {
       pending = false;
       sweep(document);
+      scheduleFloaters();
     });
   });
   function start() {
