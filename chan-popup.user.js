@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Chặn popup Shopee/TikTok Shop trên web đọc truyện
 // @namespace    chan-popup-shopee-tiktok
-// @version      1.1.0
+// @version      1.2.0
 // @description  Chặn các cú bấm bị cướp sang Shopee, TikTok Shop, Lazada: popup, nút "Close" giả, nút "Chương sau" bị gài link, tab mới tự bật, hình nổi (bóng, vợt...) đè lên truyện.
 // @updateURL    https://raw.githubusercontent.com/melaniedang/Web-ch-n-qu-ng-c-o/claude/block-mobile-ad-popups-yujame/chan-popup.user.js
 // @downloadURL  https://raw.githubusercontent.com/melaniedang/Web-ch-n-qu-ng-c-o/claude/block-mobile-ad-popups-yujame/chan-popup.user.js
@@ -52,6 +52,56 @@
     if (host === location.hostname) return false;
     return BLOCKED.some((re) => re.test(host));
   }
+
+
+  // ---- 0. Chặn mạng quảng cáo (Google AdSense/Ad Manager, banner dính đầu/cuối trang...) ----
+  const AD_NET = /(googlesyndication|doubleclick|googleadservices|adtrafficquality|adservice\.google|googletagservices|amazon-adsystem|taboola|outbrain|mgid\.com|adnxs|criteo|popads|propellerads|adsterra|exoclick|onclicka|hilltopads|admicro|adtima|eclick\.vn|ambientplatform|vliplatform|clickadu|monetag|a-ads\.com)/i;
+  const AD_CSS = [
+    'ins.adsbygoogle', '.adsbygoogle', '[data-anchor-status]', '[data-ad-slot]', '[data-ad-client]',
+    'iframe[id^="aswift_"]', 'iframe[id^="google_ads_iframe"]', '[id^="google_ads_iframe"]',
+    '[id^="div-gpt-ad"]', 'div[id^="gpt_unit_"]', 'iframe[src*="googlesyndication"]',
+    'iframe[src*="doubleclick"]', 'iframe[src*="amazon-adsystem"]', '.google-auto-placed',
+    '[id^="google_vignette"]', 'iframe[name="googlefcPresent"]',
+  ].join(',') + '{display:none!important;visibility:hidden!important;height:0!important;min-height:0!important}' +
+    // Google anchor ad đẩy trang xuống bằng padding → trả lại
+    'html[style*="padding-top"],html[style*="padding-bottom"]{padding-top:0!important;padding-bottom:0!important}';
+  function addCSS() {
+    const host = document.head || document.documentElement;
+    if (!host || document.getElementById('__chanpopup_css')) return;
+    const st = document.createElement('style');
+    st.id = '__chanpopup_css';
+    st.textContent = AD_CSS;
+    host.appendChild(st);
+  }
+  addCSS();
+
+  function killScript(n) {
+    if (n && n.tagName === 'SCRIPT' && n.src && AD_NET.test(n.src)) {
+      n.type = 'javascript/blocked';
+      n.removeAttribute('src');
+      return true;
+    }
+    if (n && n.tagName === 'IFRAME' && n.src && AD_NET.test(n.src)) {
+      n.removeAttribute('src');
+      return true;
+    }
+    return false;
+  }
+  // Script quảng cáo chèn động
+  ['appendChild', 'insertBefore'].forEach((fn) => {
+    const real = Node.prototype[fn];
+    Node.prototype[fn] = function (node, ...rest) {
+      killScript(node);
+      return real.call(this, node, ...rest);
+    };
+  });
+  // Script quảng cáo có sẵn trong HTML: chặn trước khi trình duyệt chạy
+  new MutationObserver((muts) => {
+    for (const m of muts) for (const n of m.addedNodes) {
+      killScript(n);
+      if (n.tagName === 'HEAD' || n.tagName === 'HTML') addCSS();
+    }
+  }).observe(document, { childList: true, subtree: true });
 
   // ---- Thông báo nhỏ để biết script đã chặn ----
   let toastTimer;
