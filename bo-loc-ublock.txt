@@ -1,0 +1,16 @@
+! Title: Chặn chuyển hướng Shopee/TikTok Shop/Lazada khi đọc truyện
+! Dùng cho uBlock Origin (Firefox) hoặc Brave → Bộ lọc tuỳ chỉnh.
+! Khi web cố đẩy bạn sang các trang này, trình duyệt hiện trang cảnh báo → bấm "Quay lại".
+! LƯU Ý: dòng TikTok sẽ chặn luôn tiktok.com trên trình duyệt này (app TikTok vẫn dùng bình thường).
+||s.shopee.vn^$document
+||shp.ee^$document
+||shope.ee^$document
+||shopee.vn^$document
+||vt.tiktok.com^$document
+||vm.tiktok.com^$document
+||shop.tiktok.com^$document
+||tiktok.com^$document
+||s.lazada.vn^$document
+||c.lazada.vn^$document
+||lzd.co^$document
+||ti.ki^$document
