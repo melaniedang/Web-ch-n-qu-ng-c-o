@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Chặn popup Shopee/TikTok Shop trên web đọc truyện
 // @namespace    chan-popup-shopee-tiktok
-// @version      1.3.0
+// @version      1.4.0
 // @description  Chặn các cú bấm bị cướp sang Shopee, TikTok Shop, Lazada: popup, nút "Close" giả, nút "Chương sau" bị gài link, tab mới tự bật, hình nổi (bóng, vợt...) đè lên truyện.
 // @updateURL    https://raw.githubusercontent.com/melaniedang/Web-ch-n-qu-ng-c-o/claude/block-mobile-ad-popups-yujame/chan-popup.user.js
 // @downloadURL  https://raw.githubusercontent.com/melaniedang/Web-ch-n-qu-ng-c-o/claude/block-mobile-ad-popups-yujame/chan-popup.user.js
@@ -309,8 +309,15 @@
     }
     return found;
   }
+  // Popup lừa đảo giả làm ô xác minh / đăng nhập / "bấm Cho phép"
+  const SCAM_TEXT = /(xác minh (rằng )?bạn là người|tôi là con người|tôi không phải (là )?(người máy|robot)|bạn có phải là robot|i'?m not a robot|verify (that )?you are (a )?human|are you a robot|press allow|click allow|nhấn (nút )?["“]?cho phép|bấm (nút )?["“]?cho phép|để xác nhận bạn không phải)/i;
+  function isScamPopup(el) {
+    const t = (el.innerText || el.textContent || '').slice(0, 2000);
+    return SCAM_TEXT.test(t);
+  }
   function looksLikeAd(el) {
     if (el.id === '__chanpopup_toast') return false;
+    if (isScamPopup(el)) return true;
     // Giữ lại thanh menu, nút chuyển chương, ô tìm kiếm... của web
     if (el.matches('a[href]') && sameSite(el.getAttribute('href'))) return false;
     if ([...el.querySelectorAll('a[href]')].some((a) => sameSite(a.getAttribute('href') || a.href))) return false;
@@ -333,6 +340,11 @@
   let hiddenCount = 0;
   function hideFloaters() {
     if (!document.body) return;
+    // Popup lừa đảo nằm trong iframe quảng cáo → ẩn cả khung
+    if (window !== window.top && isScamPopup(document.body)) {
+      document.documentElement.style.setProperty('display', 'none', 'important');
+      return;
+    }
     const W = window.innerWidth, H = window.innerHeight;
     const seen = new Set();
     const roots = new Set();

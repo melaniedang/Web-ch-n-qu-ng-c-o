@@ -38,9 +38,11 @@ Mở `chan-popup.user.js`, thêm 1 dòng vào danh sách `BLOCKED`, ví dụ `/(
 2. Popup, nút X giả, lớp phủ trong suốt, nút "Chương sau" bị gài link.
 3. Hình nổi (bóng, vợt...) đè lên trang truyện.
 4. Quảng cáo Google (banner dính đầu/cuối trang, quảng cáo che màn hình khi chuyển trang).
-5. Script của mạng quảng cáo popunder: danh sách đã biết + tự nhận diện domain rác (đuôi `.online`, `.xyz`, `.top`..., tên kiểu `aj1559`), script gắn `data-cfasync="false"`.
+5. Popup lừa đảo giả làm ô xác minh "Tôi là con người" / đăng nhập.
+6. Script của mạng quảng cáo popunder: danh sách đã biết + tự nhận diện domain rác (đuôi `.online`, `.xyz`, `.top`..., tên kiểu `aj1559`), script gắn `data-cfasync="false"`.
 
 ## Lịch sử cập nhật
+- 1.4.0: ẩn popup lừa đảo giả làm ô xác minh/đăng nhập ("Tôi là con người", "xác minh bạn là người thật", "I'm not a robot", "bấm Cho phép").
 - 1.3.0: chặn script quảng cáo của sangchanhteam.com (`browpotware`, `aj1559.online`) + luật nhận diện chung cho domain quảng cáo đổi liên tục.
 - 1.2.0: chặn quảng cáo Google, banner dính đầu/cuối trang.
 - 1.1.0: ẩn hình nổi đè lên trang.
