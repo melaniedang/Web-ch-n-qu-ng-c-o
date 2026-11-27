@@ -39,9 +39,11 @@ Mở `chan-popup.user.js`, thêm 1 dòng vào danh sách `BLOCKED`, ví dụ `/(
 3. Hình nổi (bóng, vợt...) đè lên trang truyện.
 4. Quảng cáo Google (banner dính đầu/cuối trang, quảng cáo che màn hình khi chuyển trang).
 5. Popup lừa đảo giả làm ô xác minh "Tôi là con người" / đăng nhập.
-6. Script của mạng quảng cáo popunder: danh sách đã biết + tự nhận diện domain rác (đuôi `.online`, `.xyz`, `.top`..., tên kiểu `aj1559`), script gắn `data-cfasync="false"`.
+6. Mọi chuyển hướng / tab mới sang web khác không do bạn tự bấm link (web cá độ, nhà cái...). Link thật bạn tự bấm vẫn mở bình thường; lỡ chặn nhầm thì bấm "Vẫn mở".
+7. Script của mạng quảng cáo popunder: danh sách đã biết + tự nhận diện domain rác (đuôi `.online`, `.xyz`, `.top`..., tên kiểu `aj1559`), script gắn `data-cfasync="false"`.
 
 ## Lịch sử cập nhật
+- 1.5.0: CHẾ ĐỘ CHẶT — chặn mọi chuyển hướng/tab mới sang web khác mà bạn không tự bấm link thật (web cá độ new88, f8bet..., quảng cáo đổi domain). Iframe quảng cáo bị khoá không cho kéo cả trang đi. Lỡ chặn nhầm → bấm "Vẫn mở" trên thông báo.
 - 1.4.0: ẩn popup lừa đảo giả làm ô xác minh/đăng nhập ("Tôi là con người", "xác minh bạn là người thật", "I'm not a robot", "bấm Cho phép").
 - 1.3.0: chặn script quảng cáo của sangchanhteam.com (`browpotware`, `aj1559.online`) + luật nhận diện chung cho domain quảng cáo đổi liên tục.
 - 1.2.0: chặn quảng cáo Google, banner dính đầu/cuối trang.

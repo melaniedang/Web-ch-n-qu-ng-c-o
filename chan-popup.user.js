@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Chặn popup Shopee/TikTok Shop trên web đọc truyện
 // @namespace    chan-popup-shopee-tiktok
-// @version      1.4.0
+// @version      1.5.0
 // @description  Chặn các cú bấm bị cướp sang Shopee, TikTok Shop, Lazada: popup, nút "Close" giả, nút "Chương sau" bị gài link, tab mới tự bật, hình nổi (bóng, vợt...) đè lên truyện.
 // @updateURL    https://raw.githubusercontent.com/melaniedang/Web-ch-n-qu-ng-c-o/claude/block-mobile-ad-popups-yujame/chan-popup.user.js
 // @downloadURL  https://raw.githubusercontent.com/melaniedang/Web-ch-n-qu-ng-c-o/claude/block-mobile-ad-popups-yujame/chan-popup.user.js
@@ -50,7 +50,33 @@
       return false;
     }
     if (host === location.hostname) return false;
-    return BLOCKED.some((re) => re.test(host));
+    return BLOCKED.some((re) => re.test(host)) || GAMBLING.test(host);
+  }
+
+  // Web cá độ / nhà cái (hay đổi domain: new88tanthu.online, f8bet19.city...)
+  const GAMBLING = /(new88|f8bet|789bet|jun88|hi88|shbet|kubet|ku\d{2,}|8kbet|mb66|okvip|f168|qq88|nhatvip|go88|sunwin|hitclub|b52|rikvip|fb88|w88|fun88|m88|188bet|12bet|vn88|bk8|fi88|ae888|33win|nohu|sv388|win55|j88|tf88|bet88|v9bet|da88|man88|xoso66|onbet|mu88|zbet|five88|lucky88|loto188|net88|abc8|sky88|vipwin|xx88|good88|u888|nbet|bet\d{2,}|casino|nhacai|nha-cai|keonhacai|taixiu|tai-xiu|xocdia|xoc-dia|danhbai|gamebai|game-bai|banca|ban-ca)/i;
+
+  // So sánh "cùng một web" (sangchanhteam.com = www.sangchanhteam.com = cdn.sangchanhteam.com)
+  const SLD = /\.(com|net|org|edu|gov|ac|co|info|biz|name|pro|int|health)\.[a-z]{2}$/i;
+  function siteOf(host) {
+    const parts = String(host).toLowerCase().split('.');
+    return parts.slice(SLD.test(host) ? -3 : -2).join('.');
+  }
+  function isCrossSite(url) {
+    const raw = String(url || '').trim();
+    if (!raw) return false;
+    let u;
+    try { u = new URL(raw, location.href); } catch (e) { return false; }
+    if (u.protocol === 'javascript:' || u.protocol === 'about:' || u.protocol === 'blob:' || u.protocol === 'data:') return false;
+    if (!/^https?:$/.test(u.protocol)) return true; // intent://, shopee://, tiktok://...
+    return siteOf(u.hostname) !== siteOf(location.hostname);
+  }
+  const noHash = (u) => { try { const x = new URL(u, location.href); x.hash = ''; return x.href; } catch (e) { return String(u); } };
+  // Link bạn TỰ bấm (chạm thật vào link thật) → cho đi. Còn lại → chặn.
+  let lastTrusted = null;
+  let allowOnce = null;
+  function trustedNav(url) {
+    return !!lastTrusted && Date.now() - lastTrusted.t < 5000 && noHash(lastTrusted.url) === noHash(url);
   }
 
 
@@ -105,6 +131,18 @@
       n.removeAttribute('src');
       return true;
     }
+    // Iframe của web khác: không cho tự mở tab / chuyển cả trang đi
+    if (n && n.tagName === 'IFRAME' && !n.hasAttribute('sandbox') && n.getAttribute('src') && isCrossSite(n.src)) {
+      const SB = 'allow-scripts allow-same-origin allow-forms allow-presentation';
+      if (n.isConnected && n.parentNode) {
+        // iframe đã nằm trong trang → thay bằng bản sao có sandbox ngay từ đầu
+        const c = n.cloneNode(true);
+        c.setAttribute('sandbox', SB);
+        n.parentNode.replaceChild(c, n);
+      } else {
+        n.setAttribute('sandbox', SB);
+      }
+    }
     return false;
   }
   // Script quảng cáo chèn động
@@ -150,6 +188,24 @@
       host = new URL(url, location.href).hostname || host.split(':')[0];
     } catch (e) {}
     toast('Đã chặn chuyển sang ' + host.slice(0, 40));
+    // Lỡ chặn nhầm link bạn muốn mở → nút "Vẫn mở" (không hiện với Shopee/TikTok/cá độ)
+    try {
+      if (!/^https?:/i.test(new URL(url, location.href).protocol) || isBlocked(url)) return;
+      const el = document.getElementById('__chanpopup_toast');
+      const btn = document.createElement('button');
+      btn.textContent = 'Vẫn mở';
+      btn.style.cssText = 'margin-left:10px;pointer-events:auto;background:#fff;color:#111;border:0;border-radius:12px;padding:3px 10px;font:inherit;font-weight:600';
+      btn.addEventListener('click', (ev) => {
+        if (!ev.isTrusted) return;
+        ev.stopImmediatePropagation();
+        allowOnce = url;
+        location.href = url;
+      }, true);
+      el.style.pointerEvents = 'auto';
+      el.appendChild(btn);
+      clearTimeout(toastTimer);
+      toastTimer = setTimeout(() => { el.style.display = 'none'; el.style.pointerEvents = 'none'; }, 4000);
+    } catch (e) {}
   }
 
   // ---- 2. Chặn window.open (tab mới tự bật) ----
@@ -169,7 +225,8 @@
   const realOpen = window.open;
   window.open = function (url, ...rest) {
     // Popunder kiểu mở tab trống rồi gán location sau → cũng chặn
-    if (!url || url === 'about:blank' || isBlocked(url)) {
+    const ok = url && allowOnce && noHash(url) === noHash(allowOnce);
+    if (!ok && (!url || url === 'about:blank' || isBlocked(url) || isCrossSite(url))) {
       blockedMsg(url || 'tab mới');
       return fakeWindow();
     }
@@ -188,7 +245,14 @@
 
   function onClick(ev) {
     const a = findLink(ev);
-    if (a && isBlocked(a.href)) {
+    if (!a) return;
+    // Link sang web khác nằm trong khung nổi/lớp phủ = bẫy quảng cáo
+    const trap = isBlocked(a.href) || (isCrossSite(a.href) && (!ev.isTrusted || !!floatingRoot(a)));
+    if (!trap) {
+      if (ev.isTrusted && isCrossSite(a.href)) lastTrusted = { url: a.href, t: Date.now() };
+      return;
+    }
+    {
       ev.preventDefault();
       ev.stopImmediatePropagation();
       blockedMsg(a.href);
@@ -213,12 +277,12 @@
   // Link bị script bấm hộ: a.click() / dispatchEvent
   const realAClick = HTMLAnchorElement.prototype.click;
   HTMLAnchorElement.prototype.click = function () {
-    if (isBlocked(this.href)) return blockedMsg(this.href);
+    if (isBlocked(this.href) || isCrossSite(this.href)) return blockedMsg(this.href);
     return realAClick.call(this);
   };
   const realDispatch = EventTarget.prototype.dispatchEvent;
   EventTarget.prototype.dispatchEvent = function (ev) {
-    if (this instanceof HTMLAnchorElement && ev && ev.type === 'click' && isBlocked(this.href)) {
+    if (this instanceof HTMLAnchorElement && ev && ev.type === 'click' && (isBlocked(this.href) || isCrossSite(this.href))) {
       blockedMsg(this.href);
       return false;
     }
@@ -226,7 +290,7 @@
   };
   const realSubmit = HTMLFormElement.prototype.submit;
   HTMLFormElement.prototype.submit = function () {
-    if (isBlocked(this.action)) return blockedMsg(this.action);
+    if (isBlocked(this.action) || isCrossSite(this.action)) return blockedMsg(this.action);
     return realSubmit.call(this);
   };
 
@@ -235,9 +299,12 @@
   if (window.navigation && typeof window.navigation.addEventListener === 'function') {
     window.navigation.addEventListener('navigate', (e) => {
       try {
-        if (e.destination && isBlocked(e.destination.url) && e.cancelable) {
+        const url = e.destination && e.destination.url;
+        if (!url || !e.cancelable) return;
+        if (allowOnce && noHash(url) === noHash(allowOnce)) { allowOnce = null; return; }
+        if (isBlocked(url) || (isCrossSite(url) && !trustedNav(url))) {
           e.preventDefault();
-          blockedMsg(e.destination.url);
+          blockedMsg(url);
         }
       } catch (err) {}
     });
