@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Chặn popup Shopee/TikTok Shop trên web đọc truyện
 // @namespace    chan-popup-shopee-tiktok
-// @version      1.5.0
+// @version      1.5.1
 // @description  Chặn các cú bấm bị cướp sang Shopee, TikTok Shop, Lazada: popup, nút "Close" giả, nút "Chương sau" bị gài link, tab mới tự bật, hình nổi (bóng, vợt...) đè lên truyện.
 // @updateURL    https://raw.githubusercontent.com/melaniedang/Web-ch-n-qu-ng-c-o/claude/block-mobile-ad-popups-yujame/chan-popup.user.js
 // @downloadURL  https://raw.githubusercontent.com/melaniedang/Web-ch-n-qu-ng-c-o/claude/block-mobile-ad-popups-yujame/chan-popup.user.js
@@ -17,6 +17,27 @@
 
 (function () {
   'use strict';
+  const VERSION = '1.5.1';
+  // Báo lỗi ra màn hình (để chụp gửi lại khi script không chạy được)
+  function showBadge(msg, color) {
+    const draw = () => {
+      try {
+        const b = document.createElement('div');
+        b.textContent = msg;
+        b.style.cssText = 'position:fixed;top:8px;left:50%;transform:translateX(-50%);z-index:2147483647;' +
+          'background:' + color + ';color:#fff;font:12px/1.4 system-ui,sans-serif;padding:6px 12px;border-radius:14px;' +
+          'pointer-events:none;max-width:92vw;text-align:center';
+        (document.body || document.documentElement).appendChild(b);
+        setTimeout(() => b.remove(), color === '#b00020' ? 15000 : 2500);
+      } catch (e) {}
+    };
+    if (document.body) draw(); else document.addEventListener('DOMContentLoaded', draw);
+  }
+  if (window.top === window) {
+    if (window.__chanpopupLoaded) return; // đã cài 2 bản → chỉ chạy 1
+    window.__chanpopupLoaded = VERSION;
+  }
+  try {
 
   // ---- 1. Danh sách đích bị chặn (thêm domain vào đây nếu gặp chỗ mới) ----
   const BLOCKED = [
@@ -463,4 +484,8 @@
   }
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', start);
   else start();
+  if (window.top === window) showBadge('🛡️ Chặn quảng cáo v' + VERSION + ' đang bật', 'rgba(20,120,60,.92)');
+  } catch (err) {
+    showBadge('🛡️ Lỗi script v' + VERSION + ': ' + (err && err.message ? err.message : err), '#b00020');
+  }
 })();
