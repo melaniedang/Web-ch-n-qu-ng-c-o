@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Chặn popup Shopee/TikTok Shop trên web đọc truyện
 // @namespace    chan-popup-shopee-tiktok
-// @version      1.7.0
+// @version      1.7.1
 // @description  Chặn các cú bấm bị cướp sang Shopee, TikTok Shop, Lazada: popup, nút "Close" giả, nút "Chương sau" bị gài link, tab mới tự bật, hình nổi (bóng, vợt...) đè lên truyện.
 // @updateURL    https://raw.githubusercontent.com/melaniedang/Web-ch-n-qu-ng-c-o/claude/block-mobile-ad-popups-yujame/chan-popup.user.js
 // @downloadURL  https://raw.githubusercontent.com/melaniedang/Web-ch-n-qu-ng-c-o/claude/block-mobile-ad-popups-yujame/chan-popup.user.js
@@ -17,7 +17,7 @@
 
 (function () {
   'use strict';
-  const VERSION = '1.7.0';
+  const VERSION = '1.7.1';
   // Báo lỗi ra màn hình (để chụp gửi lại khi script không chạy được)
   function showBadge(msg, color) {
     const draw = () => {
@@ -591,7 +591,8 @@
   }
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', start);
   else start();
-  if (window.top === window) {
+  // Dòng xanh chỉ hiện khi bật chế độ kiểm tra: thêm #chanqc vào cuối địa chỉ trang
+  if (window.top === window && /chanqc/i.test(location.hash)) {
     const nav = window.navigation && typeof window.navigation.addEventListener === 'function' ? '✓' : '✗';
     showBadge('🛡️ Chặn QC v' + VERSION + ' đang bật · chặn chuyển trang ' + nav + ' · chạy ' + (EARLY ? 'sớm' : 'muộn'), 'rgba(20,120,60,.92)');
   }
