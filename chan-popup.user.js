@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Chặn popup Shopee/TikTok Shop trên web đọc truyện
 // @namespace    chan-popup-shopee-tiktok
-// @version      1.6.0
+// @version      1.7.0
 // @description  Chặn các cú bấm bị cướp sang Shopee, TikTok Shop, Lazada: popup, nút "Close" giả, nút "Chương sau" bị gài link, tab mới tự bật, hình nổi (bóng, vợt...) đè lên truyện.
 // @updateURL    https://raw.githubusercontent.com/melaniedang/Web-ch-n-qu-ng-c-o/claude/block-mobile-ad-popups-yujame/chan-popup.user.js
 // @downloadURL  https://raw.githubusercontent.com/melaniedang/Web-ch-n-qu-ng-c-o/claude/block-mobile-ad-popups-yujame/chan-popup.user.js
@@ -17,7 +17,7 @@
 
 (function () {
   'use strict';
-  const VERSION = '1.6.0';
+  const VERSION = '1.7.0';
   // Báo lỗi ra màn hình (để chụp gửi lại khi script không chạy được)
   function showBadge(msg, color) {
     const draw = () => {
@@ -33,6 +33,7 @@
     };
     if (document.body) draw(); else document.addEventListener('DOMContentLoaded', draw);
   }
+  const EARLY = document.readyState === 'loading' && !document.body;
   if (window.top === window) {
     if (window.__chanpopupLoaded) return; // đã cài 2 bản → chỉ chạy 1
     window.__chanpopupLoaded = VERSION;
@@ -274,11 +275,36 @@
     return null;
   }
 
+  // Link mới bị chèn vào trang (để biết link phủ lên nút "Chương sau" vừa xuất hiện)
+  const insertedAt = new WeakMap();
+  // Link nội bộ dẫn sang trang khác của web (Chương sau, Chương trước, Mục lục...)
+  function isInternalNav(a) {
+    try {
+      const u = new URL(a.href, location.href);
+      if (!/^https?:$/.test(u.protocol) || isCrossSite(u.href)) return false;
+      return u.pathname !== location.pathname || u.search !== location.search;
+    } catch (e) { return false; }
+  }
+  function looksInvisible(a) {
+    try {
+      const cs = getComputedStyle(a);
+      if (parseFloat(cs.opacity) < 0.1 || cs.visibility === 'hidden') return true;
+      return !(a.textContent || '').trim() && !a.querySelector('img,svg,picture,canvas,i,span');
+    } catch (e) { return false; }
+  }
   function onClick(ev) {
     const a = findLink(ev);
     if (!a) return;
-    // Link sang web khác nằm trong khung nổi/lớp phủ = bẫy quảng cáo
-    const trap = isBlocked(a.href) || (isCrossSite(a.href) && (!ev.isTrusted || !!floatingRoot(a)));
+    // KHOÁ NÚT CHUYỂN CHƯƠNG: bạn bấm link nội bộ → trình duyệt đi thẳng,
+    // không cho script quảng cáo nào nghe thấy cú bấm này (nên không thể chen Shopee/cá độ vào)
+    if (ev.isTrusted && isInternalNav(a)) {
+      ev.stopImmediatePropagation();
+      return;
+    }
+    // Link sang web khác nằm trong khung nổi/lớp phủ/vừa bị chèn/trong suốt = bẫy quảng cáo
+    const t = insertedAt.get(a);
+    const trap = isBlocked(a.href) || (isCrossSite(a.href) &&
+      (!ev.isTrusted || !!floatingRoot(a) || looksInvisible(a) || (t && Date.now() - t < 4000)));
     if (!trap) {
       if (ev.isTrusted && isCrossSite(a.href)) lastTrusted = { url: a.href, t: Date.now() };
       return;
@@ -292,18 +318,62 @@
     }
   }
   // Đăng ký ở window + capture để chạy TRƯỚC script quảng cáo
-  ['click', 'auxclick', 'mousedown', 'mouseup', 'touchend', 'pointerup'].forEach((t) => {
+  ['click', 'auxclick', 'mousedown', 'mouseup', 'touchstart', 'touchend', 'pointerdown', 'pointerup'].forEach((t) => {
     window.addEventListener(
       t,
       (ev) => {
         if (t === 'click' || t === 'auxclick') return onClick(ev);
         // Với các event khác chỉ chặn script quảng cáo nghe event, không preventDefault (để cuộn trang bình thường)
         const a = findLink(ev);
-        if (a && isBlocked(a.href)) ev.stopImmediatePropagation();
+        if (a && (isBlocked(a.href) || (ev.isTrusted && isInternalNav(a)))) ev.stopImmediatePropagation();
       },
-      true
+      { capture: true, passive: true }
     );
   });
+
+  // Quảng cáo lén đổi link "Chương sau" thành link quảng cáo → đổi lại ngay
+  try {
+    new MutationObserver((muts) => {
+      for (const m of muts) {
+        if (m.type === 'attributes') {
+          const a = m.target;
+          if (a.tagName === 'A' && m.oldValue && !isCrossSite(m.oldValue) && isCrossSite(a.getAttribute('href'))) {
+            a.setAttribute('href', m.oldValue);
+            toast('Đã chặn link bị tráo');
+          }
+        } else if (document.readyState !== 'loading') {
+          for (const n of m.addedNodes) {
+            if (n.nodeType !== 1) continue;
+            if (n.tagName === 'A') insertedAt.set(n, Date.now());
+            if (n.querySelectorAll) n.querySelectorAll('a').forEach((x) => insertedAt.set(x, Date.now()));
+          }
+        }
+      }
+    }).observe(document, { subtree: true, childList: true, attributes: true, attributeFilter: ['href'], attributeOldValue: true });
+  } catch (e) {}
+
+  // Popunder lấy window.open "sạch" từ iframe ẩn → vá luôn window.open trong mọi iframe cùng nguồn
+  function patchWin(w) {
+    try {
+      if (!w || w === window || w.__chanpopupPatched) return;
+      w.__chanpopupPatched = true;
+      w.open = window.open;
+      if (w.HTMLAnchorElement) w.HTMLAnchorElement.prototype.click = HTMLAnchorElement.prototype.click;
+      if (w.HTMLFormElement) w.HTMLFormElement.prototype.submit = HTMLFormElement.prototype.submit;
+    } catch (e) {}
+  }
+  try {
+    const cw = Object.getOwnPropertyDescriptor(HTMLIFrameElement.prototype, 'contentWindow');
+    Object.defineProperty(HTMLIFrameElement.prototype, 'contentWindow', {
+      configurable: true, enumerable: cw.enumerable,
+      get() { const w = cw.get.call(this); patchWin(w); return w; },
+    });
+    const cd = Object.getOwnPropertyDescriptor(HTMLIFrameElement.prototype, 'contentDocument');
+    Object.defineProperty(HTMLIFrameElement.prototype, 'contentDocument', {
+      configurable: true, enumerable: cd.enumerable,
+      get() { const d = cd.get.call(this); if (d) patchWin(d.defaultView); return d; },
+    });
+  } catch (e) {}
 
   // Link bị script bấm hộ: a.click() / dispatchEvent
   const realAClick = HTMLAnchorElement.prototype.click;
@@ -521,7 +591,10 @@
   }
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', start);
   else start();
-  if (window.top === window) showBadge('🛡️ Chặn quảng cáo v' + VERSION + ' đang bật', 'rgba(20,120,60,.92)');
+  if (window.top === window) {
+    const nav = window.navigation && typeof window.navigation.addEventListener === 'function' ? '✓' : '✗';
+    showBadge('🛡️ Chặn QC v' + VERSION + ' đang bật · chặn chuyển trang ' + nav + ' · chạy ' + (EARLY ? 'sớm' : 'muộn'), 'rgba(20,120,60,.92)');
+  }
   } catch (err) {
     showBadge('🛡️ Lỗi script v' + VERSION + ': ' + (err && err.message ? err.message : err), '#b00020');
   }

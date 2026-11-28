@@ -43,6 +43,7 @@ Mở `chan-popup.user.js`, thêm 1 dòng vào danh sách `BLOCKED`, ví dụ `/(
 7. Script của mạng quảng cáo popunder: danh sách đã biết + tự nhận diện domain rác (đuôi `.online`, `.xyz`, `.top`..., tên kiểu `aj1559`), script gắn `data-cfasync="false"`.
 
 ## Lịch sử cập nhật
+- 1.7.0: KHOÁ NÚT CHUYỂN CHƯƠNG — bấm link nội bộ là đi thẳng, quảng cáo không chen vào được. Đổi lại link bị tráo, chặn link trong suốt phủ lên nút, vá window.open lấy từ iframe ẩn. Dòng xanh hiển thị Safari có hỗ trợ chặn chuyển trang hay không.
 - 1.6.0: bắt popup quảng cáo giấu nội dung trong iframe / shadow DOM (popup "Tôi là con người" trên Safari). Hiện dòng xanh khi script chạy, dòng đỏ khi lỗi.
 - 1.5.0: CHẾ ĐỘ CHẶT — chặn mọi chuyển hướng/tab mới sang web khác mà bạn không tự bấm link thật (web cá độ new88, f8bet..., quảng cáo đổi domain). Iframe quảng cáo bị khoá không cho kéo cả trang đi. Lỡ chặn nhầm → bấm "Vẫn mở" trên thông báo.
 - 1.4.0: ẩn popup lừa đảo giả làm ô xác minh/đăng nhập ("Tôi là con người", "xác minh bạn là người thật", "I'm not a robot", "bấm Cho phép").
