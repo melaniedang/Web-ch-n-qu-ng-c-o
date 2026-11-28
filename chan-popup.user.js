@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Chặn popup Shopee/TikTok Shop trên web đọc truyện
 // @namespace    chan-popup-shopee-tiktok
-// @version      1.5.1
+// @version      1.6.0
 // @description  Chặn các cú bấm bị cướp sang Shopee, TikTok Shop, Lazada: popup, nút "Close" giả, nút "Chương sau" bị gài link, tab mới tự bật, hình nổi (bóng, vợt...) đè lên truyện.
 // @updateURL    https://raw.githubusercontent.com/melaniedang/Web-ch-n-qu-ng-c-o/claude/block-mobile-ad-popups-yujame/chan-popup.user.js
 // @downloadURL  https://raw.githubusercontent.com/melaniedang/Web-ch-n-qu-ng-c-o/claude/block-mobile-ad-popups-yujame/chan-popup.user.js
@@ -17,7 +17,7 @@
 
 (function () {
   'use strict';
-  const VERSION = '1.5.1';
+  const VERSION = '1.6.0';
   // Báo lỗi ra màn hình (để chụp gửi lại khi script không chạy được)
   function showBadge(msg, color) {
     const draw = () => {
@@ -181,6 +181,16 @@
       if (n.tagName === 'HEAD' || n.tagName === 'HTML') addCSS();
     }
   }).observe(document, { childList: true, subtree: true });
+
+  // Quảng cáo hay dùng shadow DOM "đóng" để trốn trình chặn → buộc mở
+  try {
+    const realAttach = Element.prototype.attachShadow;
+    if (realAttach) {
+      Element.prototype.attachShadow = function (init) {
+        return realAttach.call(this, Object.assign({}, init, { mode: 'open' }));
+      };
+    }
+  } catch (e) {}
 
   // ---- Thông báo nhỏ để biết script đã chặn ----
   let toastTimer;
@@ -399,9 +409,29 @@
   }
   // Popup lừa đảo giả làm ô xác minh / đăng nhập / "bấm Cho phép"
   const SCAM_TEXT = /(xác minh (rằng )?bạn là người|tôi là con người|tôi không phải (là )?(người máy|robot)|bạn có phải là robot|i'?m not a robot|verify (that )?you are (a )?human|are you a robot|press allow|click allow|nhấn (nút )?["“]?cho phép|bấm (nút )?["“]?cho phép|để xác nhận bạn không phải)/i;
+  // Đọc cả chữ giấu trong shadow DOM và iframe cùng nguồn
+  function deepText(el, depth) {
+    depth = depth || 0;
+    let t = el.innerText || el.textContent || '';
+    if (depth > 3) return t;
+    const nodes = [el].concat([...(el.querySelectorAll ? el.querySelectorAll('*') : [])].slice(0, 800));
+    for (const n of nodes) {
+      if (n.shadowRoot) t += ' ' + deepText(n.shadowRoot, depth + 1);
+      if (n.tagName === 'IFRAME') {
+        try { const d = n.contentDocument; if (d && d.body) t += ' ' + deepText(d.body, depth + 1); } catch (e) {}
+      }
+    }
+    return t;
+  }
+  function deepQuery(el, sel) {
+    if (el.matches && el.matches(sel)) return true;
+    if (el.querySelector && el.querySelector(sel)) return true;
+    if (el.shadowRoot && el.shadowRoot.querySelector(sel)) return true;
+    return [...(el.querySelectorAll ? el.querySelectorAll('*') : [])].slice(0, 800)
+      .some((n) => n.shadowRoot && n.shadowRoot.querySelector(sel));
+  }
   function isScamPopup(el) {
-    const t = (el.innerText || el.textContent || '').slice(0, 2000);
-    return SCAM_TEXT.test(t);
+    return SCAM_TEXT.test(deepText(el).slice(0, 6000));
   }
   function looksLikeAd(el) {
     if (el.id === '__chanpopup_toast') return false;
@@ -417,8 +447,15 @@
     const r = el.getBoundingClientRect();
     if (r.width < 8 || r.height < 8) return false;
     const vArea = window.innerWidth * window.innerHeight;
+    // Khung iframe / shadow DOM nổi (quảng cáo hay giấu nội dung trong đó)
+    if (el.tagName === 'IFRAME' || el.tagName === 'EMBED' || el.tagName === 'OBJECT') return r.width * r.height < vArea * 0.95 || isCrossSite(el.src || el.data || '');
+    if (el.shadowRoot && deepQuery(el, 'img,svg,canvas,video,iframe,input,button')) return true;
+    // Shadow DOM "đóng" (không đọc được): khung nổi trông rỗng nhưng vẫn chiếm chỗ trên màn hình
+    if (!el.shadowRoot && el.childElementCount === 0 && !(el.textContent || '').trim() &&
+        r.width * r.height > vArea * 0.05 && r.width * r.height < vArea * 0.95 &&
+        !/url\(/.test(getComputedStyle(el).backgroundImage)) return true;
     const hasVisual =
-      imgs > 0 || el.querySelector('svg,canvas,video,iframe,picture') ||
+      imgs > 0 || deepQuery(el, 'img,svg,canvas,video,iframe,picture,embed,object') ||
       /url\(/.test(getComputedStyle(el).backgroundImage) ||
       [...el.querySelectorAll('*')].some((c) => /url\(/.test(getComputedStyle(c).backgroundImage));
     // Lớp phủ trong suốt to (bẫy chạm) hoặc hình nổi nhỏ/vừa
