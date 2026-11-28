@@ -26,6 +26,13 @@ Gồm 2 file:
 3. Mở app Userscripts, chọn thư mục lưu script → lưu file `chan-popup.user.js` vào đó
    (hoặc trong Safari bấm biểu tượng 🧩 → Userscripts → **+** → **New JS** → dán nội dung → Lưu).
 
+## iPhone — thêm lớp chặn AdGuard (khuyên dùng, chặn triệt để)
+Userscript trên Safari thường chạy MUỘN hơn quảng cáo → lúc chặn được lúc không. AdGuard chặn ngay từ cấp mạng nên quảng cáo không tải được.
+1. Cài **AdGuard** (App Store, miễn phí) → mở app, làm theo hướng dẫn bật các bộ chặn trong Cài đặt → Safari → Tiện ích mở rộng.
+2. AdGuard → **Bảo vệ** → **Bảo vệ Safari** → **Bộ lọc** → **Bộ lọc tuỳ chỉnh** → **Thêm bộ lọc** → dán link raw của `bo-loc-adguard-ios.txt`.
+   (Nếu không thêm được: mở file, copy toàn bộ → **Quy tắc người dùng** → dán.)
+3. Giữ nguyên userscript — hai lớp bổ trợ nhau.
+
 ## Brave (không cài được script)
 - Trên web truyện: bấm biểu tượng 🦁 → bật **Chặn script** (Block scripts). Nhiều web truyện vẫn hiện chữ bình thường khi tắt JavaScript, còn popup thì mất hết.
 - Có thể dán `bo-loc-ublock.txt` vào phần **Bộ lọc tuỳ chỉnh** (Settings → Shields & privacy → Content filtering), nếu bản Brave của bạn có mục này.
